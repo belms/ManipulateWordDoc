@@ -9,14 +9,15 @@ import kotlin.reflect.KClass
 
 class UpdateWordTemplate {
 
+    
     private var result: ArrayList<Any> = ArrayList()
 
     /**
      * Method loads word docx as a WordprocessingMLPackage for further manipulation
      * @param filePath: location path to word document which will be used
      */
-    fun getTemplate(filePath: String): WordprocessingMLPackage {
-        return WordprocessingMLPackage.load(File(filePath).inputStream())
+    fun getTemplate(filePath: InputStream): WordprocessingMLPackage {
+        return WordprocessingMLPackage.load(filePath)
     }
 
     /**
@@ -85,21 +86,34 @@ class UpdateWordTemplate {
      * @param replacementText: map of strings we wish to write to a file with their corresponding placeholders
      * @param template: template, as a copy of our word file in which we find table
      */
-     fun replaceTable( placeholders: Array<String>, replacementText: List<Map<String, String>>,template: WordprocessingMLPackage) {
-        var tables: List<Any> = getAllElementsFromObject(template.mainDocumentPart.contents.body, Tbl::class)
+    private fun replaceTable(
+        placeholders: Array<String>,
+        replacementText: List<Map<String, String>>,
+        template: WordprocessingMLPackage
+    ) {
+        val tables: List<Any> = getAllElementsFromObject(template.mainDocumentPart.contents.body, Tbl::class)
+        var tableToAdd: Tbl = Tbl()
+        for (values in replacementText) {
 
-        //1. find table
-        var tempTable: Tbl = getTemplateTable(tables as List<Tbl>, placeholders[0])
-        result = ArrayList()
-        //Find rows in which we will replace strings
-        var rows: List<Any> = getAllElementsFromObject(tempTable, Tr::class)
+            //1. find table
+            var tempTable: Tbl = getTemplateTable(tables as List<Tbl>, placeholders[0])
+            if (tempTable.content.isEmpty()) {
+                tempTable = createTable(template, tableToAdd)
+            } else {
+                tableToAdd = tempTable
+            }
+            result = ArrayList()
+            //Find rows in which we will replace strings
+            var rows: List<Any> = getAllElementsFromObject(tempTable, Tr::class)
 
-        if (rows.size > 0) {
-            // replace each row placeholder with our text
-            for (row in rows) {
-                replacePlaceholder(row, replacementText, placeholders)
+            if (rows.isNotEmpty()) {
+                // replace each row placeholder with our text
+                for (row in rows) {
+                    replacePlaceholder(row, listOf(values), placeholders)
+                }
             }
         }
+
     }
 
     /**
@@ -127,12 +141,22 @@ class UpdateWordTemplate {
         return templateTable
     }
 
-
-     fun updateWordDocument(placeholders: Array<String>, replacementText: List<Map<String, String>>, template: WordprocessingMLPackage, filePath: String) {
-        replaceTable(placeholders, replacementText, template)
-        writeDocx(template,filePath)
+    private fun createTable(wordPackage: WordprocessingMLPackage, tbl: Tbl): Tbl {
+        wordPackage.mainDocumentPart.addObject(tbl)
+        return tbl
     }
 
+    fun updateWordDocument(
+        placeholders: Array<String>,
+        replacementText: List<Map<String, String>>,
+        template: WordprocessingMLPackage,
+        filePath: String
+    ) {
+        replaceTable(placeholders, replacementText, template)
+        writeDocx(template, filePath)
+    }
+
+}
 }
 
 
