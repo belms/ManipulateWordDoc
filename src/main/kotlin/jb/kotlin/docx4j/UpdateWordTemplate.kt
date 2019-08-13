@@ -9,7 +9,6 @@ import kotlin.reflect.KClass
 
 class UpdateWordTemplate {
 
-    
     private var result: ArrayList<Any> = ArrayList()
 
     /**
@@ -91,29 +90,26 @@ class UpdateWordTemplate {
         replacementText: List<Map<String, String>>,
         template: WordprocessingMLPackage
     ) {
-        val tables: List<Any> = getAllElementsFromObject(template.mainDocumentPart.contents.body, Tbl::class)
-        var tableToAdd: Tbl = Tbl()
         for (values in replacementText) {
-
-            //1. find table
-            var tempTable: Tbl = getTemplateTable(tables as List<Tbl>, placeholders[0])
-            if (tempTable.content.isEmpty()) {
-                tempTable = createTable(template, tableToAdd)
-            } else {
-                tableToAdd = tempTable
-            }
             result = ArrayList()
-            //Find rows in which we will replace strings
-            var rows: List<Any> = getAllElementsFromObject(tempTable, Tr::class)
-
-            if (rows.isNotEmpty()) {
-                // replace each row placeholder with our text
-                for (row in rows) {
-                    replacePlaceholder(row, listOf(values), placeholders)
+            val tables: List<Any> = getAllElementsFromObject(template.mainDocumentPart.contents.body, Tbl::class)
+            //1. find table with placeholders
+            val tempTable: Tbl = getTemplateTable(tables as List<Tbl>, placeholders[0])
+            result = ArrayList()
+            if (tempTable.content.isNotEmpty()){
+                if (replacementText.indexOf(values) != replacementText.size-1) {
+                    createTable(template, tempTable)
+                }
+                //Find rows in which we will replace strings
+                var rows: List<Any> = getAllElementsFromObject(tempTable, Tr::class)
+                if (rows.isNotEmpty()) {
+                    // replace each row placeholder with our text
+                    for (i in 0..2) {
+                        replacePlaceholder(rows[i], listOf(values), placeholders)
+                    }
                 }
             }
         }
-
     }
 
     /**
@@ -142,7 +138,13 @@ class UpdateWordTemplate {
     }
 
     private fun createTable(wordPackage: WordprocessingMLPackage, tbl: Tbl): Tbl {
-        wordPackage.mainDocumentPart.addObject(tbl)
+        val factory = Context.getWmlObjectFactory()
+        val newTable = deepCopy(tbl)
+
+        wordPackage.mainDocumentPart.contents.body.content.add(newTable)
+
+        val br = factory.createP()
+        wordPackage.mainDocumentPart.contents.body.content.add(br)
         return tbl
     }
 
@@ -157,7 +159,5 @@ class UpdateWordTemplate {
     }
 
 }
-}
-
 
 
